@@ -15,6 +15,7 @@
       "!**/dist",
       "!**/cache",
       "!**/coverage",
+      "!tools/tls-fetch/vendor",
       "!**/bun.lock",
       "!**/tsconfig.tsbuildinfo"
     ]

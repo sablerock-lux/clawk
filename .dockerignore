@@ -36,3 +36,5 @@ scripts/
 # Tests never run inside the image.
 **/*.test.ts
 **/__tests__/
+!tools/tls-fetch/vendor/**
+tools/tls-fetch/bin/

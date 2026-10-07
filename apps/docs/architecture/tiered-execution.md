@@ -28,10 +28,13 @@ Tier 4: Residential Proxy ─── success ──→ cache cookies, return (15�
 
 ## Tier 1 — Plain HTTP Fetch
 
-The cheapest tier. Uses Bun's native `fetch()` with the same Firefox navigation header set the Camoufox browser tiers send:
+The cheapest tier. Uses a Go subprocess built with vendored `tls-client` v1.16.0
+and its `Firefox_148` TLS/HTTP2 profile. Navigation headers use the corresponding
+Firefox user-agent; this is not an exact match to the separately pinned Camoufox
+browser. This product includes tls-client software developed by Bogdan Finn.
 
 ```
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
 Accept-Language: en-US,en;q=0.9
 Accept-Encoding: gzip, deflate, br, zstd
@@ -49,6 +52,18 @@ Priority: u=0, i
 
 **Skip with:** `skipHttp: true` in the request body, or deployment-wide `SCRAPE_MIN_TIER=2`.
 Use `maxTier: 1` to cap execution at Tier 1 instead.
+
+The helper returns headers before streaming the encoded response bytes. Tier 1
+retains redirect validation, certificate policy and challenge detection. Each hop
+uses an isolated process with no shared cookie jar; browser sessions are not
+injected into static requests. MITM direct forwarding preserves caller cookies,
+but escalation into the scraper applies its stricter header sanitizer.
+
+There is no build-time fingerprint API or generated Camoufox profile. Docker
+images include the helper; local development requires `bun run build:tls`.
+The MITM listener's separate Tier 0 forwarder is unchanged. Use the existing
+`MITM_ALWAYS_SCRAPE=true` setting to bypass that forwarder when using the proxy;
+native `/scrape` already starts at Tier 1.
 
 ## Tier 2 — Cached Browser Session
 

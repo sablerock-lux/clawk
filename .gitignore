@@ -8,3 +8,4 @@ apps/docs/.vitepress/dist/
 *.tsbuildinfo
 dist/
 .turbo/
+tools/tls-fetch/bin/

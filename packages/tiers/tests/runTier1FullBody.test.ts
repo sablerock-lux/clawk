@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { runTier1 } from "../src/tiers/1"
+import { tier1Transport } from "../src/utils/tlsTransport"
 
 const installFetchMock = (responder: () => Response) => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as { fetch: typeof fetch }).fetch = (async () => responder()) as typeof fetch
+  const originalFetch = tier1Transport.fetch
+  tier1Transport.fetch = (async () => responder()) as typeof fetch
   return () => {
-    ;(globalThis as { fetch: typeof fetch }).fetch = originalFetch
+    tier1Transport.fetch = originalFetch
   }
 }
 

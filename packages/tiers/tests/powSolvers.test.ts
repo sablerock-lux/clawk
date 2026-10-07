@@ -11,6 +11,7 @@ import {
   isCloudflarePage,
   needsJs,
 } from "../src/utils/detect"
+import { tier1Transport } from "../src/utils/tlsTransport"
 import { ALTCHA_WIDGET_HTML, FRIENDLY_CAPTCHA_V2_HTML, FRIENDLY_CAPTCHA_WIDGET_HTML } from "./fixtures/pow"
 
 describe("provider-specific proof-of-work widget detection", () => {
@@ -232,12 +233,12 @@ describe("in-page proof-of-work widget solvers", () => {
 
 describe("Tier 1 widget escalation", () => {
   async function withFetch(response: Response, run: () => Promise<void>) {
-    const original = globalThis.fetch
-    ;(globalThis as { fetch: typeof fetch }).fetch = (async () => response) as typeof fetch
+    const original = tier1Transport.fetch
+    tier1Transport.fetch = (async () => response) as typeof fetch
     try {
       await run()
     } finally {
-      ;(globalThis as { fetch: typeof fetch }).fetch = original
+      tier1Transport.fetch = original
     }
   }
 

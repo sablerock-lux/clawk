@@ -7,6 +7,7 @@ import { capturePageScreenshot } from "../src/screenshot"
 import { runTier2 } from "../src/tiers/2"
 import { runTier3 } from "../src/tiers/3"
 import { runTier4 } from "../src/tiers/4"
+import { tier1Transport } from "../src/utils/tlsTransport"
 
 const PAGE_HTML = `<html><head><title>Ordinary Page</title></head><body>${"content ".repeat(20)}</body></html>`
 const JPEG = Buffer.from("fake-jpeg-bytes")
@@ -316,9 +317,9 @@ describe("orchestrator", () => {
   })
 
   test("allows Tier 1 to succeed without producing or forcing a screenshot", async () => {
-    const originalFetch = globalThis.fetch
+    const originalFetch = tier1Transport.fetch
     let browserAcquired = false
-    globalThis.fetch = (async () =>
+    tier1Transport.fetch = (async () =>
       new Response(PAGE_HTML, { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch
 
     try {
@@ -337,7 +338,7 @@ describe("orchestrator", () => {
       expect(result.screenshot).toBeUndefined()
       expect(browserAcquired).toBeFalse()
     } finally {
-      globalThis.fetch = originalFetch
+      tier1Transport.fetch = originalFetch
     }
   })
 

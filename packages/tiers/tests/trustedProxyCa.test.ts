@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rootCertificates } from "node:tls"
 import { runTier1 } from "../src/tiers/1"
+import { tier1Transport } from "../src/utils/tlsTransport"
 
-const originalFetch = globalThis.fetch
+const originalFetch = tier1Transport.fetch
 
 afterEach(() => {
-  globalThis.fetch = originalFetch
+  tier1Transport.fetch = originalFetch
 })
 
 describe("trusted proxy CA", () => {
   test("adds the private CA alongside public roots for only that fetch", async () => {
     let options: Parameters<typeof fetch>[1]
-    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    tier1Transport.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
       options = init
       return new Response("Pong", { headers: { "content-type": "text/plain" } })
     }) as typeof fetch
@@ -35,7 +36,7 @@ describe("trusted proxy CA", () => {
 
   test("does not alter TLS options without recognized local proxy trust", async () => {
     let options: Parameters<typeof fetch>[1]
-    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    tier1Transport.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
       options = init
       return new Response("Pong", { headers: { "content-type": "text/plain" } })
     }) as typeof fetch

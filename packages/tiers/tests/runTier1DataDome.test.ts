@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { runTier1 } from "../src/tiers/1"
+import { tier1Transport } from "../src/utils/tlsTransport"
 import {
   DATADOME_CAPTCHA,
   DATADOME_INTERSTITIAL,
@@ -8,12 +9,12 @@ import {
 } from "./fixtures/datadome"
 
 async function withFetch(response: Response, run: () => Promise<void>) {
-  const original = globalThis.fetch
-  ;(globalThis as { fetch: typeof fetch }).fetch = (async () => response) as typeof fetch
+  const original = tier1Transport.fetch
+  tier1Transport.fetch = (async () => response) as typeof fetch
   try {
     await run()
   } finally {
-    ;(globalThis as { fetch: typeof fetch }).fetch = original
+    tier1Transport.fetch = original
   }
 }
 

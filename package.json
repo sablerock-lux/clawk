@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "bun --cwd apps/api dev",
+    "dev:api": "bun run build:tls && bun --cwd apps/api dev",
     "dev:web": "bun --cwd apps/web dev",
     "dev:docs": "bun --cwd apps/docs dev",
     "lint": "biome lint .",
@@ -15,9 +15,11 @@
     "check": "biome check .",
     "fix": "biome check . --write",
     "typecheck": "bun --filter '*' typecheck",
-    "test": "bun test",
+    "build:tls": "cd tools/tls-fetch && CGO_ENABLED=0 go build -mod=vendor -trimpath -o bin/tls-fetch .",
+    "check:tls": "cd tools/tls-fetch && go vet -mod=vendor ./... && go test -mod=vendor ./...",
+    "test": "bun run build:tls && bun test",
     "build": "bun --cwd apps/web build && bun --cwd apps/docs build",
-    "verify": "bun run check && bun run typecheck && bun run test && bun run build"
+    "verify": "bun run check && bun run check:tls && bun run typecheck && bun run test && bun run build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14"

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replace Tier 1's Bun fetch with a vendored Go `tls-client` subprocess using the Firefox 148 TLS/HTTP2 profile and matching user-agent. Preserve encoded response bytes, proxy and certificate policy, redirect validation, and early challenge detection; leave Tier 0, browser tiers and residential proxies unchanged.
+
 - Add optional `BROWSER_HARDWARE_CONCURRENCY` to size native browser PoW workers on small deployments; skip Anubis crash retries after a confirmed container OOM kill.
 
 - Keep Anubis PoW in the native browser with lightweight DOM polling, bounded waits, stale-session recovery and destination checks (#189).

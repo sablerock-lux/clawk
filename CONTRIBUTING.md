@@ -17,12 +17,13 @@ For security issues, **do not open a public issue** — see [SECURITY.md](SECURI
 
 ## Development setup
 
-Requirements: **Bun 1.4.2** and **Docker** (for the Redis service used in tests).
+Requirements: **Bun 1.4.2**, **Go 1.27.1**, and **Docker** (for the Redis service used in tests).
 
 ```bash
 git clone https://github.com/germondai/trawl.git
 cd trawl
 bun install
+bun run build:tls
 cp .env.example .env
 ```
 
@@ -49,6 +50,13 @@ bun run verify      # full release gate: check, types, tests, and builds
 ```
 
 CI runs `bun run verify` on every PR.
+
+Tier 1 uses the Go helper described in [tools/tls-fetch/README.md](tools/tls-fetch/README.md).
+`bun run test` builds it before running tests; build it explicitly before using
+`bun test` directly. `bun run check:tls` runs Go vet and the helper's local HTTP/TLS
+tests. Dependencies are vendored, so normal helper builds do not download modules.
+`TLS_FETCH_BINARY` can select a matching prebuilt helper; API startup checks its
+protocol and Firefox profile. `bun run dev:api` builds the local helper first.
 
 ### Browser integration tests
 
