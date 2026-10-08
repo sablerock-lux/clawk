@@ -12,6 +12,7 @@ The native endpoint exposes TRAWL's full feature set: tier capping, session IDs,
 ```typescript
 interface ScrapeRequest {
   url: string
+  includeResponseBody?: boolean          // bounded decoded document bytes, default false
   maxTimeout?: number                    // ms, default 60000
   skipHttp?: boolean                     // skip Tier 1 (plain fetch), default false
   maxTier?: 1 | 2 | 3 | 4              // cap escalation at this tier
@@ -81,6 +82,24 @@ favicons, and MHTML archives can contain credentials, tokens, personal data, or 
 Treat these opt-in fields as sensitive and open archives only when you trust their source.
 
 ## Response
+
+For article/document clients, `includeResponseBody: true` adds
+`document: { encoding: "base64", data, byteLength, contentType }`.
+Decode `data` from base64 once; HTTP compression has already been removed.
+PDFs and other binary files retain their bytes. Use `html` for rendered browser
+HTML instead of the captured pre-render document. Internal typed-array `body`
+is never serialized by this endpoint. `responseHeaders` still describe the
+upstream response, not the decoded `document` representation.
+
+Document mode checks public HTTP(S) targets on ports 80/443, including redirects
+and browser requests. DNS validation is not connection-time IP pinning. Source
+and decoded bodies, plus rendered HTML, are limited to 10,000,000 bytes. Tier 1
+streams stop at the limit; browser automation may buffer bodies internally.
+Errors include `source_too_large` (413), `invalid_document` (422),
+`document_unavailable` (502), and `invalid_target` (400). A blocked escalation
+with no transport errors returns `scrape_exhausted` (500); service/transport
+failures remain retryable. Missing captures never become empty-file successes.
+Use `maxTier: 3` to start at Tier 1 and allow browser escalation without Tier 4.
 
 ```typescript
 interface ScrapeResult {

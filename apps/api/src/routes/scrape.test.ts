@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { BrowserHandle } from "@trawl/browser"
-import type { OrchestratorDeps } from "@trawl/tiers"
-import type { SessionData } from "@trawl/types"
+import { DocumentError, type OrchestratorDeps } from "@trawl/tiers"
+import type { ScrapeResult, SessionData } from "@trawl/types"
 import { MetricsStore } from "../metrics"
 import { scrapeRoute } from "./scrape"
 
@@ -64,6 +64,98 @@ const post = (body: unknown) =>
   )
 
 const blockedRequest = { url: "https://example.com", skipHttp: true, maxTier: 2, maxTimeout: 4_000 }
+
+describe("POST /scrape document contract", () => {
+  const pdf = Buffer.from([37, 80, 68, 70, 45, 255, 0, 128])
+  const result: ScrapeResult = {
+    url: "https://1.1.1.1/article",
+    html: "",
+    cookies: [],
+    userAgent: "test",
+    statusCode: 200,
+    tier: 1,
+    sessionCached: false,
+    timings: [],
+    totalMs: 1,
+    body: pdf,
+    contentType: "application/pdf",
+  }
+  const send = async (input: Record<string, unknown>, output = result) => {
+    const dependencies = blockedDeps()
+    const store = new MetricsStore()
+    let called = false
+    const app = scrapeRoute(
+      () => dependencies,
+      () => ({}),
+      store,
+      async (_request, deps) => {
+        called = true
+        await deps.validateOutboundUrl?.(output.url)
+        return output
+      },
+    )
+    try {
+      const response = await app.handle(
+        new Request("http://localhost/scrape", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: result.url, ...input }),
+        }),
+      )
+      expect(dependencies.validateOutboundUrl).toBeUndefined()
+      return { status: response.status, data: await response.json(), called }
+    } finally {
+      store.close()
+    }
+  }
+  test("returns a lossless base64 document only on request", async () => {
+    const response = await send({ includeResponseBody: true, maxTier: 3 })
+    expect(response.status).toBe(200)
+    expect(Buffer.from(response.data.document.data, "base64")).toEqual(pdf)
+    expect(response.data.body).toBeUndefined()
+    const normal = await send({})
+    expect(normal.data.body).toBeUndefined()
+    expect(normal.data.document).toBeUndefined()
+  })
+  test("rejects invalid mode flags and private or nonstandard targets before scraping", async () => {
+    for (const input of [
+      { includeResponseBody: "yes" },
+      { includeResponseBody: true, url: "http://127.0.0.1/private" },
+      { includeResponseBody: true, url: "https://1.1.1.1:8443/article" },
+    ]) {
+      const response = await send(input)
+      expect(response.status).toBe(400)
+      expect(response.called).toBe(false)
+    }
+  })
+  test("validates effective destinations and reports missing captures", async () => {
+    expect((await send({ includeResponseBody: true }, { ...result, url: "http://127.0.0.1/private" })).status).toBe(400)
+    const missing = await send({ includeResponseBody: true }, { ...result, body: undefined })
+    expect(missing.status).toBe(502)
+    expect(missing.data.code).toBe("document_unavailable")
+  })
+  test("maps document size failures to a terminal structured response", async () => {
+    const store = new MetricsStore()
+    const app = scrapeRoute(
+      blockedDeps,
+      () => ({}),
+      store,
+      async () => {
+        throw new DocumentError("source_too_large", "Source exceeds retrieval limit")
+      },
+    )
+    const response = await app.handle(
+      new Request("http://localhost/scrape", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: result.url, includeResponseBody: true }),
+      }),
+    )
+    expect(response.status).toBe(413)
+    expect((await response.json()).code).toBe("source_too_large")
+    store.close()
+  })
+})
 
 describe("POST /scrape on a blocked outcome", () => {
   test("records requests rejected before the scraper starts", async () => {

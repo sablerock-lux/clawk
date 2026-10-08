@@ -1,3 +1,4 @@
+import { checkDocumentSize, DocumentError } from "./document"
 import { normalizeHtml } from "./html"
 
 export interface MinimalResponse {
@@ -48,17 +49,20 @@ export const browserDocumentHtml = (contentType: string | undefined, pageHtml: s
   return normalizeHtml(pageHtml)
 }
 
-export const captureResponse = async (response?: MinimalResponse): Promise<CapturedResponse> => {
+export const captureResponse = async (response?: MinimalResponse, bounded = false): Promise<CapturedResponse> => {
   if (!response) return {}
   try {
+    if (bounded) checkDocumentSize(Number(response.headers()["content-length"] ?? 0))
     const raw = await response.body()
+    if (bounded) checkDocumentSize(raw.byteLength)
     const responseHeaders = await response.allHeaders()
     return {
       body: raw instanceof Uint8Array ? raw : new Uint8Array(raw),
       responseHeaders,
       contentType: responseHeaders["content-type"] ?? "application/octet-stream",
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof DocumentError) throw error
     return {}
   }
 }

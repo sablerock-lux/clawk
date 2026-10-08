@@ -26,6 +26,7 @@ const CONSOLE_LEVELS: Record<string, ConsoleLogEntry["level"]> = {
 // MainDocumentResponseTracker (the response listener already exists there) rather than
 // by this module — it travels in the same bag so a tier takes one capture argument.
 export interface CaptureOptions extends ResponseCaptureOptions {
+  includeResponseBody?: boolean
   followMetaRefresh?: boolean
   screenshotFullPage?: boolean
   screenshotWaitForSelector?: string
