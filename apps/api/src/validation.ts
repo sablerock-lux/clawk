@@ -85,7 +85,6 @@ export function validateScrapeRequest(body: unknown): asserts body is ScrapeRequ
     )
   }
   for (const field of [
-    "includeResponseBody",
     "consoleLogs",
     "networkLogs",
     "redirectChain",

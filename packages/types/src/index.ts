@@ -18,7 +18,6 @@ export type SupportedMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEA
 
 export interface ScrapeRequest {
   url: string
-  includeResponseBody?: boolean
   maxTimeout?: number
   skipHttp?: boolean
   maxTier?: 1 | 2 | 3 | 4
@@ -217,15 +216,6 @@ export interface ScrapeResult {
   // document order. Present (possibly empty) only when the request asked for them and a
   // browser tier served the page.
   favicons?: FaviconEntry[]
-}
-
-export type ScrapeResponse = Omit<ScrapeResult, "body"> & {
-  document?: {
-    encoding: "base64"
-    data: string
-    byteLength: number
-    contentType: string
-  }
 }
 
 export interface SessionData {

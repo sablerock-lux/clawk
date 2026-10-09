@@ -114,7 +114,6 @@ export async function scrape(
   // only via the thrown ScrapeError.
   let blockedEvidence: BlockedEvidence | undefined
   const capture = {
-    includeResponseBody: req.includeResponseBody,
     followMetaRefresh: req.followMetaRefresh,
     screenshotFullPage: req.screenshotFullPage,
     screenshotWaitForSelector: req.screenshotWaitForSelector,
@@ -220,7 +219,6 @@ export async function scrape(
       ignoreCertificateErrors,
       trustedProxyCa,
       maxTimeout - (Date.now() - totalStart),
-      req.includeResponseBody,
     )
     if (req.followMetaRefresh && t1.status === "success" && t1.html && isHtmlContentType(t1.contentType)) {
       const refresh = await metaRefreshTarget(t1.html, t1.effectiveUrl ?? req.url)

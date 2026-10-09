@@ -23,7 +23,6 @@ import {
   isBrowserErrorPage,
   isCloudflarePage,
 } from "../utils/detect"
-import { DocumentError } from "../utils/document"
 import { isGoogleSorryUrl } from "../utils/googleSorry"
 import { trackMainDocumentResponses } from "../utils/mainResponse"
 import { followMetaRefresh } from "../utils/metaRefresh"
@@ -291,7 +290,7 @@ export async function runTier2(
 
     const cookies: Cookie[] = toCookies(await activeContext.cookies())
 
-    const captured = await captureResponse(mainResponse.response, capture.includeResponseBody)
+    const captured = await captureResponse(mainResponse.response)
 
     return {
       tier: 2,
@@ -312,7 +311,6 @@ export async function runTier2(
       mhtml: isHtmlContentType(captured.contentType) ? pageCapture.archive(page.url(), finalHtml) : undefined,
     }
   } catch (err) {
-    if (err instanceof DocumentError) throw err
     return {
       tier: 2,
       status: "error",

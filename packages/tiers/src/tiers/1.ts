@@ -19,13 +19,11 @@ import {
   isBlocked,
   isCloudflarePage,
 } from "../utils/detect"
-import { DocumentError, decodeDocument, readDocument } from "../utils/document"
 import { isGoogleSorryUrl } from "../utils/googleSorry"
 import { normalizeHtml } from "../utils/html"
 import type { OutboundUrlValidator } from "../utils/outboundPolicy"
 import { normalizeProxyError, proxyResponseFailure } from "../utils/proxyFailure"
 import { decodeTextBody, isHtmlContentType, isTextContentType } from "../utils/response"
-import { RequestValidationError } from "../utils/sanitize"
 import { TIER1_USER_AGENT, tier1Transport } from "../utils/tlsTransport"
 
 export interface Tier1Result extends TierResult {
@@ -83,7 +81,6 @@ export async function runTier1(
   ignoreCertificateErrors?: boolean,
   trustedProxyCa?: string,
   timeoutMs = 60_000,
-  includeResponseBody = false,
 ): Promise<Tier1Result> {
   const start = Date.now()
   let certificateError: string | undefined
@@ -215,10 +212,8 @@ export async function runTier1(
     // Preserve encoded representation bytes for the MITM proxy and binary
     // content. Decode a separate view for challenge inspection and `/scrape`'s
     // text-only `html` field without invalidating the upstream response headers.
-    const rawBytes = includeResponseBody ? await readDocument(res) : new Uint8Array(await res.arrayBuffer())
-    const decodedBytes = includeResponseBody
-      ? decodeDocument(rawBytes, responseHeaders["content-encoding"])
-      : decodeResponseBody(rawBytes, responseHeaders["content-encoding"])
+    const rawBytes = new Uint8Array(await res.arrayBuffer())
+    const decodedBytes = decodeResponseBody(rawBytes, responseHeaders["content-encoding"])
 
     // Decode a bounded text preview losslessly. `fatal: false` replaces invalid
     // sequences with U+FFFD so detection helpers don't throw on non-UTF8 data.
@@ -468,7 +463,6 @@ export async function runTier1(
       statusCode: res.status,
     }
   } catch (err) {
-    if (includeResponseBody && (err instanceof DocumentError || err instanceof RequestValidationError)) throw err
     return {
       tier: 1,
       status: "error",

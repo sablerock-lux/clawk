@@ -34,7 +34,6 @@ export {
   isCloudflarePage,
   needsJs,
 } from "./utils/detect"
-export { DocumentError, documentResponse } from "./utils/document"
 export { isGoogleSorryUrl } from "./utils/googleSorry"
 export { normalizeProxy, ProxyPool, type ProxySelection } from "./utils/proxyRotator"
 export { isHtmlContentType } from "./utils/response"
