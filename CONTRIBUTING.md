@@ -57,16 +57,7 @@ API startup loads the native binding and checks the profile when Tier 1 is enabl
 Update the package and browser profile together, retaining matching navigation
 headers and running the transport, proxy, certificate and encoded-body tests.
 
-The published images target Linux AMD64 and ARM64 (glibc). Both include
-`/app/THIRD_PARTY_NOTICES.txt` for the pinned native transport. Its inventory
-covers the union of the two Linux dependency graphs, including build dependencies;
-it does not inventory unrelated Windows, macOS, or musl targets.
-When upgrading `node-wreq`, update the source revision in `tools/native-notices.ts`
-and run `bun tools/native-notices.ts` with Docker, `gh`, and `tar` available.
-The script uses upstream's pinned Rust version only to resolve dependencies,
-without compiling or emulating ARM. Normal builds copy the static notices and
-need no Rust toolchain. The inventory is not an attestation that the upstream
-npm binaries were reproducibly built from that source.
+The published images target Linux AMD64 and ARM64 (glibc).
 
 ### Browser integration tests
 
