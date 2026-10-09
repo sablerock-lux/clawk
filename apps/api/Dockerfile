@@ -1,10 +1,3 @@
-FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm AS tls-helper
-WORKDIR /src
-ENV CGO_ENABLED=0 GOTOOLCHAIN=local
-COPY tools/tls-fetch/ ./
-ARG TARGETARCH
-RUN --network=none GOOS=linux GOARCH=$TARGETARCH GOAMD64=v1 go build -mod=vendor -trimpath -o /tls-fetch .
-
 # ── Stage 1: install workspace deps (runs natively on build host) ──────────────
 FROM oven/bun:1.4.2 AS deps
 WORKDIR /app
@@ -154,8 +147,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --from=oven/bun:1.4.2  /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=camoufox          /opt/camoufox      /opt/camoufox
 COPY --from=deps              /app/node_modules  /app/node_modules
-COPY --from=tls-helper /tls-fetch /usr/local/bin/clawk-tls-fetch
-COPY --from=tls-helper /src/THIRD_PARTY_NOTICES.txt /usr/local/share/clawk-tls-fetch/THIRD_PARTY_NOTICES.txt
 
 # Strip debug symbols — Bun is statically linked (safe to strip-all); Firefox's glibc/NSS
 # .so files keep their dynamic symbols via --strip-unneeded. Saves ~75 MB uncompressed
@@ -170,9 +161,9 @@ COPY packages/browser/ /app/packages/browser/
 COPY packages/tiers/   /app/packages/tiers/
 COPY apps/api/         /app/apps/api/
 COPY package.json      /app/
+COPY THIRD_PARTY_NOTICES.txt /app/
 
 ENV CAMOUFOX_INSTALL_DIR=/opt/camoufox \
-  TLS_FETCH_BINARY=/usr/local/bin/clawk-tls-fetch \
     HOME=/tmp \
     # Safe Bun runtime knobs — all tested runtime-neutral (no behavior change).
     BUN_DISABLE_CJS=1 \

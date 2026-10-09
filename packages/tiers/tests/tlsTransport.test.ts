@@ -1,94 +1,113 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 import { gzipSync } from "node:zlib"
 import { runTier1 } from "../src/tiers/1"
-import { tlsFetch, verifyTlsHelper } from "../src/utils/tlsTransport"
+import { tlsFetch, verifyTlsTransport } from "../src/utils/tlsTransport"
 
-async function withHelper(source: string, check: () => Promise<void>) {
-  const directory = mkdtempSync(join(tmpdir(), "tls-helper-test-"))
-  const binary = join(directory, "helper")
-  const original = process.env.TLS_FETCH_BINARY
-  writeFileSync(binary, `#!${process.execPath}\n${source}\n`)
-  chmodSync(binary, 0o755)
-  process.env.TLS_FETCH_BINARY = binary
-  try {
-    await check()
-  } finally {
-    if (original === undefined) delete process.env.TLS_FETCH_BINARY
-    else process.env.TLS_FETCH_BINARY = original
-    rmSync(directory, { recursive: true, force: true })
-  }
-}
-
-describe("TLS helper subprocess", () => {
-  test("validates the compiled profile at startup", () => {
-    expect(verifyTlsHelper).not.toThrow()
+describe("native TLS transport", () => {
+  test("loads the native transport at startup", async () => {
+    await verifyTlsTransport()
   })
 
-  test("rejects malformed and oversized metadata without fallback", async () => {
-    for (const source of ['process.stdout.write("not json\\n")', 'process.stdout.write("x".repeat(270000))']) {
-      await withHelper(source, async () => {
-        await expect(tlsFetch("https://example.invalid")).rejects.toThrow()
-      })
-    }
-  })
-
-  test("reports a helper crash after headers as a body failure", async () => {
-    await withHelper(
-      'process.stdout.write(JSON.stringify({version:1,status:200,headers:{}})+"\\npartial", () => process.exit(1))',
-      async () => {
-        const response = await tlsFetch("https://example.invalid")
-        await expect(response.arrayBuffer()).rejects.toThrow("interrupted")
+  test("reuses healthy connections without retaining response cookies", async () => {
+    const ports: number[] = []
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(request, server) {
+        ports.push(server.requestIP(request)!.port)
+        return new Response(request.headers.get("cookie") ?? "no cookie", {
+          headers: { "set-cookie": "session=private" },
+        })
       },
-    )
-  })
-
-  test("terminates a stalled helper on deadline", async () => {
-    await withHelper("setInterval(() => {}, 1000)", async () => {
-      await expect(tlsFetch("https://example.invalid", { timeoutMs: 100 })).rejects.toThrow("timed out")
     })
-  })
-
-  test("fails clearly for incompatible startup metadata", async () => {
-    await withHelper("process.stdout.write(JSON.stringify({version:0}))", async () => {
-      expect(verifyTlsHelper).toThrow("missing or incompatible")
-    })
-  })
-
-  test("fails without fallback when the helper is missing", async () => {
-    await withHelper("", async () => {
-      process.env.TLS_FETCH_BINARY += ".missing"
-      expect(verifyTlsHelper).toThrow("missing or incompatible")
-      await expect(tlsFetch("https://example.invalid")).rejects.toThrow()
-    })
+    try {
+      for (let index = 0; index < 3; index++) {
+        const response = await tlsFetch(server.url.href)
+        expect(await response.text()).toBe("no cookie")
+      }
+      expect(new Set(ports).size).toBe(1)
+    } finally {
+      server.stop(true)
+    }
   })
 
   test("rejects an already aborted request", async () => {
     await expect(tlsFetch("https://example.invalid", { signal: AbortSignal.abort() })).rejects.toThrow("aborted")
   })
 
-  test("reaps a helper when its response is aborted or exceeds its deadline", async () => {
-    const source = `process.stdout.write(JSON.stringify({version:1,status:200,headers:{"x-helper-pid":[String(process.pid)]}})+"\\n"); setInterval(() => {}, 1000)`
-    await withHelper(source, async () => {
-      for (const mode of ["abort", "deadline", "cancel"]) {
-        const controller = new AbortController()
-        const response = await tlsFetch("https://example.invalid", {
-          signal: controller.signal,
-          timeoutMs: mode === "deadline" ? 300 : 5000,
-        })
-        const pid = Number(response.headers.get("x-helper-pid"))
-        expect(pid).toBeGreaterThan(0)
-        if (mode === "cancel") {
-          await response.body?.cancel()
-        } else {
-          if (mode === "abort") controller.abort()
-          await expect(response.arrayBuffer()).rejects.toThrow("interrupted")
-        }
-        expect(() => process.kill(pid, 0)).toThrow()
-      }
+  test("enforces deadlines before response headers", async () => {
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => new Promise<Response>(() => {}),
     })
+    try {
+      const started = Date.now()
+      const error = await tlsFetch(server.url.href, { timeoutMs: 100 }).catch((error: unknown) => error)
+      expect(String(error)).toMatch(/timed out|timeout/i)
+      expect(Date.now() - started).toBeLessThan(1000)
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test("bounds concurrent cancelled responses without blocking healthy requests", async () => {
+    let active = 0
+    let closed = 0
+    let allClosed: () => void = () => {}
+    const drained = new Promise<void>((resolve) => {
+      allClosed = resolve
+    })
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(request) {
+        if (new URL(request.url).pathname === "/healthy") return new Response("healthy")
+        active++
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array([1]))
+            },
+            cancel() {
+              active--
+              if (++closed === 24) allClosed()
+            },
+          }),
+        )
+      },
+    })
+    try {
+      await Promise.all(
+        Array.from({ length: 24 }, async (_value, index) => {
+          const mode = ["abort", "deadline", "cancel"][index % 3]
+          const controller = new AbortController()
+          const response = await tlsFetch(server.url.href, {
+            signal: controller.signal,
+            timeoutMs: 500,
+          })
+          const reader = response.body!.getReader()
+          const pending = (async () => {
+            while (!(await reader.read()).done) {}
+          })()
+          if (mode === "cancel") {
+            await reader.cancel()
+            await pending
+          } else {
+            if (mode === "abort") controller.abort()
+            const error = await pending.catch((error: unknown) => error)
+            expect(String(error)).toContain(mode === "abort" ? "aborted" : "timed out")
+          }
+          const healthy = await tlsFetch(`${server.url}healthy`, { timeoutMs: 1000 })
+          expect(await healthy.text()).toBe("healthy")
+        }),
+      )
+      await drained
+      expect(active).toBe(0)
+      expect(closed).toBe(24)
+    } finally {
+      server.stop(true)
+    }
   })
 
   test("keeps gzip bytes encoded while Tier 1 inspects decoded text", async () => {

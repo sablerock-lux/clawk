@@ -1,4 +1,4 @@
-import { verifyTlsHelper } from "@trawl/tiers"
+import { verifyTlsTransport } from "@trawl/tiers"
 import { createApiApp } from "./app"
 import {
   HEADFUL_POOL_SIZE,
@@ -21,7 +21,7 @@ import { registerLifecycleHandlers } from "./lifecycle"
 import { type MitmProxyHandle, shutdownMitmProxy, startMitmProxy } from "./proxy/server"
 import { startMemoryMonitor } from "./runtimeMemory"
 
-if (SCRAPE_MIN_TIER === 1) verifyTlsHelper()
+if (SCRAPE_MIN_TIER === 1) await verifyTlsTransport()
 
 createApiApp().listen(PORT)
 

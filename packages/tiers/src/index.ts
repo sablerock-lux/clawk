@@ -50,4 +50,4 @@ export {
   type SupportedMethod,
   sanitizeHeaders,
 } from "./utils/sanitize"
-export { verifyTlsHelper } from "./utils/tlsTransport"
+export { verifyTlsTransport } from "./utils/tlsTransport"

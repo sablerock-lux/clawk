@@ -55,12 +55,17 @@ jobs:
           cache-to: type=gha,scope=clawk-${{ matrix.arch }},mode=max
           secrets: |
             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-      - name: Smoke-test native helper
+      - name: Smoke-test native transport
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          docker run --rm --network none --entrypoint /usr/local/bin/clawk-tls-fetch \
-            "$IMAGE@$DIGEST" --version
+          docker run --rm --network none --entrypoint bun \
+            -v "$PWD/packages/tiers/tests:/app/packages/tiers/tests:ro" \
+            "$IMAGE@$DIGEST" test \
+            packages/tiers/tests/tlsTransport.test.ts \
+            packages/tiers/tests/runTier1Encoding.test.ts \
+            packages/tiers/tests/trustedProxyCa.test.ts \
+            packages/tiers/tests/ignoreCertificateErrors.test.ts
       - name: Export digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}

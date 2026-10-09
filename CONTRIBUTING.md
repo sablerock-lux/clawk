@@ -17,13 +17,12 @@ For security issues, **do not open a public issue** — see [SECURITY.md](SECURI
 
 ## Development setup
 
-Requirements: **Bun 1.4.2**, **Go 1.27.1**, and **Docker** (for the Redis service used in tests).
+Requirements: **Bun 1.4.2** and **Docker** (for the Redis service used in tests).
 
 ```bash
 git clone https://github.com/germondai/trawl.git
 cd trawl
 bun install
-bun run build:tls
 cp .env.example .env
 ```
 
@@ -51,12 +50,23 @@ bun run verify      # full release gate: check, types, tests, and builds
 
 CI runs `bun run verify` on every PR.
 
-Tier 1 uses the Go helper described in [tools/tls-fetch/README.md](tools/tls-fetch/README.md).
-`bun run test` builds it before running tests; build it explicitly before using
-`bun test` directly. `bun run check:tls` runs Go vet and the helper's local HTTP/TLS
-tests. Dependencies are vendored, so normal helper builds do not download modules.
-`TLS_FETCH_BINARY` can select a matching prebuilt helper; API startup checks its
-protocol and Firefox profile. `bun run dev:api` builds the local helper first.
+Tier 1 uses the pinned `node-wreq` native addon with the explicit `firefox_148`
+profile. `bun install` installs the platform-specific binary; optional native
+dependencies must not be omitted. No Go toolchain or helper build is needed.
+API startup loads the native binding and checks the profile when Tier 1 is enabled.
+Update the package and browser profile together, retaining matching navigation
+headers and running the transport, proxy, certificate and encoded-body tests.
+
+The published images target Linux AMD64 and ARM64 (glibc). Both include
+`/app/THIRD_PARTY_NOTICES.txt` for the pinned native transport. Its inventory
+covers the union of the two Linux dependency graphs, including build dependencies;
+it does not inventory unrelated Windows, macOS, or musl targets.
+When upgrading `node-wreq`, update the source revision in `tools/native-notices.ts`
+and run `bun tools/native-notices.ts` with Docker, `gh`, and `tar` available.
+The script uses upstream's pinned Rust version only to resolve dependencies,
+without compiling or emulating ARM. Normal builds copy the static notices and
+need no Rust toolchain. The inventory is not an attestation that the upstream
+npm binaries were reproducibly built from that source.
 
 ### Browser integration tests
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Replace Tier 1's Bun fetch with a vendored Go `tls-client` subprocess using the Firefox 148 TLS/HTTP2 profile and matching user-agent. Preserve encoded response bytes, proxy and certificate policy, redirect validation, and early challenge detection; leave Tier 0, browser tiers and residential proxies unchanged.
+- Replace Tier 1's Go `tls-client` subprocess with pinned `node-wreq` 3.2.1 and its Firefox 148 TLS/HTTP2 profile. Reuse native connections while preserving encoded response bytes, scoped CA trust, proxy and certificate policy, redirect validation, and early challenge detection. Enforce caller deadlines and test timeout-bounded native cleanup under concurrent cancellation; remove the Go helper and toolchain requirements. Tier 0, browser tiers and residential proxies are unchanged.
 
 - Add optional `BROWSER_HARDWARE_CONCURRENCY` to size native browser PoW workers on small deployments; skip Anubis crash retries after a confirmed container OOM kill.
 
